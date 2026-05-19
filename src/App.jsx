@@ -101,6 +101,36 @@ function App() {
   const speechUttRef = useRef(null);
   const ignoreRecognitionEndRef = useRef(false);
 
+  // Attentive Mode (Ventana Conversacional Activa de 1 Minuto)
+  const [conversationActive, setConversationActive] = useState(false);
+  const conversationActiveRef = useRef(false);
+  const conversationActiveTimerRef = useRef(null);
+
+  // Sync conversation active ref to prevent stale closures in event loops
+  useEffect(() => {
+    conversationActiveRef.current = conversationActive;
+  }, [conversationActive]);
+
+  // Limpiar temporizadores al desmontar
+  useEffect(() => {
+    return () => {
+      if (conversationActiveTimerRef.current) {
+        clearTimeout(conversationActiveTimerRef.current);
+      }
+    };
+  }, []);
+
+  const activateAttentiveMode = () => {
+    setConversationActive(true);
+    if (conversationActiveTimerRef.current) {
+      clearTimeout(conversationActiveTimerRef.current);
+    }
+    conversationActiveTimerRef.current = setTimeout(() => {
+      setConversationActive(false);
+      console.log("🤫 [Attentive Mode] 1 minuto de inactividad transcurrido. Lucy vuelve a esperar el comando 'Lucy'.");
+    }, 60000); // 1 minuto = 60000ms
+  };
+
   // Sync speech state ref to prevent stale closures in browser event loops
   useEffect(() => {
     speechStateRef.current = speechState;
@@ -211,22 +241,30 @@ function App() {
         const wakeWords = ['lucy', 'luci', 'lusi', 'lusy', 'lucía', 'lucia', 'luz y'];
         const containsWake = wakeWords.some(word => speechLower.includes(word));
 
-        if (containsWake) {
-          // Remove the wake word from the speech prompt to make the AI prompt clean
-          let cleanedPrompt = speechText;
-          wakeWords.forEach(word => {
-            const regex = new RegExp(`\\b${word}\\b`, 'gi');
-            cleanedPrompt = cleanedPrompt.replace(regex, '');
-          });
+        // Lucy está atenta si estamos en la ventana activa de 1 min O si se dice su palabra clave
+        const isCurrentlyAttentive = conversationActiveRef.current || containsWake;
 
-          // Clean initial and trailing symbols
+        if (isCurrentlyAttentive) {
+          // Limpiar la palabra clave de activación si estuvo presente en la frase
+          let cleanedPrompt = speechText;
+          if (containsWake) {
+            wakeWords.forEach(word => {
+              const regex = new RegExp(`\\b${word}\\b`, 'gi');
+              cleanedPrompt = cleanedPrompt.replace(regex, '');
+            });
+          }
+
+          // Limpiar símbolos iniciales y finales
           cleanedPrompt = cleanedPrompt
             .replace(/^[\s,\.\?\!¡¿\-]+/g, '')
             .replace(/[\s,\.\?\!¡¿\-]+$/g, '')
             .trim();
 
+          // Activar/Renovar la ventana de 1 minuto de conversación activa
+          activateAttentiveMode();
+
           if (!cleanedPrompt) {
-            // User only called the name: respond with a random friendly prompt
+            // El usuario solo la llamó por su nombre: responder de forma amigable
             const answers = [
               "¿Sí? Dime, te escucho.",
               "¡Hola! Aquí estoy, estoy atenta.",
@@ -236,11 +274,11 @@ function App() {
             const randomReply = answers[Math.floor(Math.random() * answers.length)];
             speakText(randomReply);
           } else {
-            // Process the cleaned prompt directly
+            // Procesar la consulta limpia directamente
             handleUserSpeech(cleanedPrompt);
           }
         } else {
-          console.log("Speech ignored (Missing wake word 'Lucy'):", speechText);
+          console.log("Speech ignored (Missing wake word 'Lucy' and inactive conversation):", speechText);
         }
       }
     };
