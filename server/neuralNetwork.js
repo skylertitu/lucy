@@ -424,31 +424,68 @@ function processUserRequest(prompt, userSettings = {}) {
     };
   }
 
-  // 1. Clasificación por Red Neuronal (MLP)
-  const bag = bagOfWords(tokens, VOCABULARY);
-  const { Y } = network.forward(bag);
+  const lowerText = prompt.toLowerCase();
   
-  // Encontrar la clase con mayor probabilidad
-  let maxIdx = 0;
-  let maxVal = -1;
-  for (let k = 0; k < Y.length; k++) {
-    if (Y[k] > maxVal) {
-      maxVal = Y[k];
-      maxIdx = k;
+  // --- CAPA DE PRIORIZACIÓN EXPERTA (GREETINGS FIRST) ---
+  const greetingWords = ['hola', 'buenos dias', 'buenas noches', 'saludos', 'buena tarde', 'hey', 'que tal'];
+  const hasGreetingWord = greetingWords.some(kw => {
+    const regex = new RegExp(`\\b${kw}\\b`, 'i');
+    return regex.test(lowerText);
+  });
+
+  let priorityIntent = null;
+
+  if (hasGreetingWord) {
+    // Si contiene un saludo, pero no palabras clave fuertes de acción/emoción (como 'chiste', 'creó', 'triste')
+    const actionKeywords = [
+      'chiste', 'gracioso', 'reir', 'creo', 'programo', 'creador', 'antigravity', 
+      'funciones', 'hacer', 'ayuda', 'triste', 'mal', 'pena', 'deprimido', 
+      'feliz', 'maravilla', 'quien eres', 'nombre'
+    ];
+    const hasActionWord = actionKeywords.some(kw => {
+      const regex = new RegExp(`\\b${kw}\\b`, 'i');
+      return regex.test(lowerText);
+    });
+
+    if (!hasActionWord) {
+      priorityIntent = 'greetings';
+      console.log(`🎯 [Priority Router] Saludo explícito detectado. Forzando intención: "greetings"`);
     }
   }
 
-  const intentClass = CLASSES[maxIdx];
-  const confidence = maxVal;
+  // 1. Clasificación por Red Neuronal (MLP) o Enrutamiento Prioritario
+  let finalIntent = "";
+  let finalConfidence = 1.0;
 
-  // Fallback si la confianza es muy baja o no hay coincidencia directa en el bag of words
-  const isMeaningfulInput = bag.some(val => val === 1);
-  let finalIntent = intentClass;
-  let finalConfidence = confidence;
+  if (priorityIntent) {
+    finalIntent = priorityIntent;
+    finalConfidence = 1.0;
+  } else {
+    const bag = bagOfWords(tokens, VOCABULARY);
+    const { Y } = network.forward(bag);
+    
+    // Encontrar la clase con mayor probabilidad
+    let maxIdx = 0;
+    let maxVal = -1;
+    for (let k = 0; k < Y.length; k++) {
+      if (Y[k] > maxVal) {
+        maxVal = Y[k];
+        maxIdx = k;
+      }
+    }
 
-  if (!isMeaningfulInput || confidence < 0.35) {
-    finalIntent = "default";
-    finalConfidence = isMeaningfulInput ? confidence : 0.0;
+    const intentClass = CLASSES[maxIdx];
+    const confidence = maxVal;
+
+    // Fallback si la confianza es muy baja o no hay coincidencia directa en el bag of words
+    const isMeaningfulInput = bag.some(val => val === 1);
+    finalIntent = intentClass;
+    finalConfidence = confidence;
+
+    if (!isMeaningfulInput || confidence < 0.35) {
+      finalIntent = "default";
+      finalConfidence = isMeaningfulInput ? confidence : 0.0;
+    }
   }
 
   // 2. Selección de la respuesta optimizada
