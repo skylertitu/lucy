@@ -122,16 +122,16 @@ const AudioVisualizer = ({ state = 'idle', micStream = null }) => {
         audioData = Array.from(dataArrayRef.current);
       }
 
-      // Draw the central circle's bio-glow behind the bars
+      // Draw the central circle's bio-glow behind the bars (Wider & Richer Aura)
       ctx2d.beginPath();
-      let centerGlowRad = innerRadius * 0.9;
+      let centerGlowRad = innerRadius * 1.35;
       if (state === 'listening') {
         const avg = audioData.reduce((a, b) => a + b, 0) / (audioData.length || 1);
-        centerGlowRad += (avg / 255) * 15;
+        centerGlowRad += (avg / 255) * 25;
       } else if (state === 'speaking') {
-        centerGlowRad += Math.sin(pulseRef.current * 2) * 5;
+        centerGlowRad += Math.sin(pulseRef.current * 2) * 8;
       } else {
-        centerGlowRad += Math.sin(pulseRef.current) * 3;
+        centerGlowRad += Math.sin(pulseRef.current) * 4;
       }
       const radialGlow = ctx2d.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerGlowRad);
       
@@ -139,14 +139,14 @@ const AudioVisualizer = ({ state = 'idle', micStream = null }) => {
       if (state === 'thinking') glowColor = colors.purple;
       else if (state === 'speaking') glowColor = colors.pink;
       
-      radialGlow.addColorStop(0, hexToRgba(glowColor, 0.12));
-      radialGlow.addColorStop(0.7, hexToRgba(glowColor, 0.02));
+      radialGlow.addColorStop(0, hexToRgba(glowColor, 0.18));
+      radialGlow.addColorStop(0.5, hexToRgba(glowColor, 0.05));
       radialGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx2d.fillStyle = radialGlow;
       ctx2d.arc(centerX, centerY, centerGlowRad, 0, Math.PI * 2);
       ctx2d.fill();
 
-      // Render 120 Solid Radial Equalizer Bars
+      // Render 120 Solid Radial Equalizer Bars (and their outer tip neon dots!)
       for (let i = 0; i < numBars; i++) {
         // Distribute bars evenly in a circle, adding global rotation
         const angle = (i / numBars) * Math.PI * 2 + rotationRef.current;
@@ -160,7 +160,7 @@ const AudioVisualizer = ({ state = 'idle', micStream = null }) => {
             const binIdx = Math.floor((i % (numBars / 2)) / (numBars / 2) * (audioData.length * 0.8));
             val = (audioData[binIdx] || 0) / 255;
             // Boost sensitivity
-            val = Math.min(1.0, val * 1.45 + 0.05);
+            val = Math.min(1.0, val * 1.55 + 0.05);
           } else {
             // Microphone fallback simulation
             val = 0.1 + 0.25 * Math.sin(i * 0.2 + phaseRef.current) * Math.cos(i * 0.1 + pulseRef.current);
@@ -206,8 +206,68 @@ const AudioVisualizer = ({ state = 'idle', micStream = null }) => {
         ctx2d.lineTo(innerRadius + barHeight, 0);
         ctx2d.stroke();
 
+        // PREMIUM FEATURE: Draw a tiny glowing dot at the end of each active bar!
+        if (barHeight > 6) {
+          ctx2d.beginPath();
+          ctx2d.arc(innerRadius + barHeight + 2, 0, 1.2, 0, Math.PI * 2);
+          ctx2d.fillStyle = strokeColor;
+          ctx2d.fill();
+        }
+
         ctx2d.restore();
       }
+
+      // --- Central Solid Glassy Sphere ---
+      ctx2d.beginPath();
+      const sphereRadius = innerRadius * 0.94;
+      
+      // Radial gradient for a beautiful 3D spherical shading
+      const sphereGlow = ctx2d.createRadialGradient(
+        centerX - sphereRadius * 0.2, 
+        centerY - sphereRadius * 0.2, 
+        0, 
+        centerX, 
+        centerY, 
+        sphereRadius
+      );
+      
+      sphereGlow.addColorStop(0, '#101014');
+      sphereGlow.addColorStop(0.7, '#060608');
+      sphereGlow.addColorStop(1, '#000000');
+      
+      ctx2d.fillStyle = sphereGlow;
+      ctx2d.arc(centerX, centerY, sphereRadius, 0, Math.PI * 2);
+      ctx2d.fill();
+
+      // Outer border of the central sphere
+      ctx2d.beginPath();
+      ctx2d.arc(centerX, centerY, sphereRadius, 0, Math.PI * 2);
+      ctx2d.strokeStyle = hexToRgba(glowColor, 0.4);
+      ctx2d.lineWidth = 1.6;
+      ctx2d.stroke();
+
+      // --- Concentric Energy Ripples inside the Sphere ---
+      let rippleScale = 1.0;
+      if (state === 'listening') {
+        const avg = audioData.reduce((a, b) => a + b, 0) / (audioData.length || 1);
+        rippleScale = 1.0 + (avg / 255) * 0.25;
+      } else if (state === 'speaking') {
+        rippleScale = 1.0 + Math.sin(pulseRef.current * 2) * 0.08;
+      } else {
+        rippleScale = 1.0 + Math.sin(pulseRef.current * 0.5) * 0.03;
+      }
+
+      ctx2d.beginPath();
+      ctx2d.arc(centerX, centerY, sphereRadius * 0.7 * rippleScale, 0, Math.PI * 2);
+      ctx2d.strokeStyle = hexToRgba(glowColor, 0.16);
+      ctx2d.lineWidth = 1;
+      ctx2d.stroke();
+
+      ctx2d.beginPath();
+      ctx2d.arc(centerX, centerY, sphereRadius * 0.4 * rippleScale, 0, Math.PI * 2);
+      ctx2d.strokeStyle = hexToRgba(glowColor, 0.09);
+      ctx2d.lineWidth = 1;
+      ctx2d.stroke();
 
       animationRef.current = requestAnimationFrame(render);
     };

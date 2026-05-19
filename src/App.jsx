@@ -51,8 +51,8 @@ const OFFLINE_RESPONSES = {
     "Va este. ¿Qué es una habitación con wifi pero sin internet? ¡Un calabozo moderno! Ja, ja, ja."
   ],
   capabilities: [
-    "Puedo hablar contigo por voz, escucharte mediante tu micrófono, contarte chistes, responder preguntas locales y, si configuras mi clave de API de Gemini, tendré la capacidad de responder a cualquier tema complejo con una sabiduría infinita.",
-    "Mis capacidades principales incluyen el reconocimiento de voz en tiempo real, síntesis de voz interactiva y aprendizaje. Con mi cerebro local puedo charlar de forma básica, pero si me conectas a la nube de Gemini seré una supercomputadora andante."
+    "Puedo hablar contigo por voz, escucharte mediante tu micrófono, contarte chistes, responder preguntas y modular mi respuesta según tus emociones.",
+    "Mis capacidades principales incluyen el reconocimiento de voz continuo en tiempo real, análisis local de intenciones, recomendación dinámica de temas de interfaz y síntesis de voz fluida."
   ],
   compliments: [
     "¡Oh, muchas gracias! Qué lindo detalle de tu parte. Me halagas bastante.",
@@ -65,9 +65,9 @@ const OFFLINE_RESPONSES = {
     "¡De nada! Siempre estaré aquí cuando quieras hablar de nuevo."
   ],
   default: [
-    "Es una pregunta muy interesante. En este momento estoy operando en modo local offline. Para poder responderte de manera omnisciente a cualquier tema del universo con mi máxima capacidad de inteligencia artificial, por favor ingresa una Clave de API de Gemini en mis ajustes haciendo clic en el engranaje de arriba.",
-    "Vaya, me gustaría profundizar en eso. Como ahora no tengo una conexión a mi red de Gemini, mis respuestas son limitadas. Si agregas mi clave API de Gemini en la configuración, podré debatir de física cuántica, escribir código o contarte la historia del mundo en un segundo.",
-    "Entiendo perfectamente lo que dices, pero mis servidores principales están esperando tu API Key de Gemini. Agrégala en el panel de configuración de arriba para desbloquear toda mi inteligencia conversacional."
+    "Disculpe, no estoy funcionando para responder a eso por el momento.",
+    "Lo lamento, no puedo procesar esa solicitud por el momento.",
+    "Disculpa, esa respuesta no está disponible por el momento."
   ]
 };
 
@@ -339,6 +339,27 @@ function App() {
       setMicStream(null);
     }
   };
+
+  // Auto-activación del micrófono y escucha al cargar la página (sin necesidad de clic)
+  useEffect(() => {
+    const autoStart = async () => {
+      // Pequeño retardo para asegurar la inicialización completa de la API SpeechRecognition
+      await new Promise(resolve => setTimeout(resolve, 800));
+      if (recognitionRef.current && speechStateRef.current === 'idle') {
+        const stream = await startMicStream();
+        if (stream) {
+          try {
+            ignoreRecognitionEndRef.current = false;
+            recognitionRef.current.start();
+            console.log("🎙️ [Auto-Start] Micrófono y escucha automática iniciados con éxito.");
+          } catch (err) {
+            console.log("⚠️ [Auto-Start] Escucha automática rechazada o ya en ejecución:", err);
+          }
+        }
+      }
+    };
+    autoStart();
+  }, []);
 
   // --- Voice Controls ---
   const toggleListening = async () => {
@@ -618,25 +639,6 @@ function App() {
       <div style={{ width: '90vmin', height: '90vmin', maxWidth: '480px', maxHeight: '480px', pointerEvents: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <AudioVisualizer state={speechState} micStream={micStream} />
       </div>
-      
-      {/* Floating text helper shown only if mic initialization is blocked by browser gesture rules */}
-      {speechState === 'idle' && (
-        <div style={{
-          position: 'absolute',
-          bottom: '36px',
-          color: 'rgba(255, 255, 255, 0.25)',
-          fontFamily: 'var(--mono)',
-          fontSize: '11px',
-          letterSpacing: '2px',
-          pointerEvents: 'none',
-          textTransform: 'uppercase',
-          textAlign: 'center',
-          width: '100%',
-          animation: 'pulseGlow 2s infinite'
-        }}>
-          Haz clic en la pantalla para encender a Lucy
-        </div>
-      )}
 
       {/* Settings Modal (Invisible by default, opens only on double click) */}
       {showSettings && (
